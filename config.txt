@@ -1,0 +1,4 @@
+days,                5
+agency_num_arrival,  5, 50 
+tour_num_capacity,   4, 50
+place_num,           2   
