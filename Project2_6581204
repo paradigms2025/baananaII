@@ -1,0 +1,16 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ */
+
+package Project2_6581204;
+
+/**
+ *
+ * @author Pam
+ */
+public class Project2_6581204 {
+
+    public static void main(String[] args) {
+        System.out.println("Hello World!");
+    }
+}
