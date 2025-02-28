@@ -6,7 +6,11 @@ package Project2_6581204;
 
 /**
  *
- * @author Pam
+ * @author Sukumarn Srimai 6581085
+           Rueti Limpacharoenkul 6581166
+           Chantapat Tivalai 6581193
+           Thanarat Bunbangyang 6581195
+           Banthawan Udomsap 6581204
  */
 import java.io.*;
 import java.util.*;
@@ -26,9 +30,8 @@ class Project2_6581204 {
     private static final Object daySync = new Object();
 
     public static void main(String[] args) {
-        readConfigFile("src/main/java/Project2_6581204/config.txt");  // Read input file
+        Installment installment = new Installment("configs.txt");
        
-
         // Create Places
         for (int i = 0; i < placeCount; i++) {
             places.add(new Place("Place_" + (i)));
@@ -99,9 +102,27 @@ class Project2_6581204 {
         // Print Summary
         printSummary();
     }
+     // Class to handle missing config.txt file
+        static class Installment {
+            public Installment(String filename) {
+                Scanner input = new Scanner(System.in);
 
+                while (true) {
+                    filename = "src/main/java/Project2_6581204/" + filename;
+                    try (Scanner scanner = new Scanner(new File(filename))) {
+                        break;
+                    } catch (Exception e) {
+                        System.out.println( e + "\nNew file name =");
+                        filename = input.nextLine();
+                    }
+                }
+
+                loadInstallmentData(filename);
+            }
+    
+       }
     // Read the config.txt file
-    public static void readConfigFile(String filename) {
+    public static void loadInstallmentData(String filename) {
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             days = Integer.parseInt(br.readLine().split(",")[1].trim());
             String[] agencyData = br.readLine().split(",");
@@ -114,7 +135,7 @@ class Project2_6581204 {
 
             placeCount = Integer.parseInt(br.readLine().split(",")[1].trim());
         } catch (IOException e) {
-            System.out.println("Error: Missing config.txt file.");
+            System.out.println("Error: Missing config_1.txt file.");
             System.exit(1);
         }
     }
