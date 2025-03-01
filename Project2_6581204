@@ -33,7 +33,7 @@ class Project2_6581204 {
     static CyclicBarrier customerBarrier; 
 
     public static void main(String[] args) {
-        Installment installment = new Installment("config_1.txt");
+        Installment installment = new Installment("config.txt");
         
         customerBarrier = new CyclicBarrier(agencyCount);
        
@@ -115,35 +115,43 @@ class Project2_6581204 {
         printSummary();
     }
 
-    static class Installment {
-        public Installment(String filename) {
-            try (Scanner scanner = new Scanner(new File("src/main/java/Project2_6581204/" + filename))) {
-                loadInstallmentData("src/main/java/Project2_6581204/" + filename);
-            } catch (Exception e) {
-                System.out.println(e + "\nNew file name =");
+     // Class to handle missing config.txt file
+        static class Installment {
+            public Installment(String filename) {
                 Scanner input = new Scanner(System.in);
-                loadInstallmentData(input.nextLine());
+
+                while (true) {
+                    filename = "src/main/java/Project2_6581204/" + filename;
+                    try (Scanner scanner = new Scanner(new File(filename))) {
+                        break;
+                    } catch (Exception e) {
+                        System.out.println( e + "\nNew file name =");
+                        filename = input.nextLine();
+                    }
+                }
+
+                loadInstallmentData(filename);
+            }
+    
+       }
+        // Read the config.txt file
+        public static void loadInstallmentData(String filename) {
+            try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+                days = Integer.parseInt(br.readLine().split(",")[1].trim());
+                String[] agencyData = br.readLine().split(",");
+                agencyCount = Integer.parseInt(agencyData[1].trim());
+                maxDailyArrival = Integer.parseInt(agencyData[2].trim());
+
+                String[] tourData = br.readLine().split(",");
+                tourCount = Integer.parseInt(tourData[1].trim());
+                tourCapacity = Integer.parseInt(tourData[2].trim());
+
+                placeCount = Integer.parseInt(br.readLine().split(",")[1].trim());
+            } catch (IOException e) {
+                System.out.println("Error: Missing config_1.txt file.");
+                System.exit(1);
             }
         }
-    }
-
-    public static void loadInstallmentData(String filename) {
-        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
-            days = Integer.parseInt(br.readLine().split(",")[1].trim());
-            String[] agencyData = br.readLine().split(",");
-            agencyCount = Integer.parseInt(agencyData[1].trim());
-            maxDailyArrival = Integer.parseInt(agencyData[2].trim());
-
-            String[] tourData = br.readLine().split(",");
-            tourCount = Integer.parseInt(tourData[1].trim());
-            tourCapacity = Integer.parseInt(tourData[2].trim());
-
-            placeCount = Integer.parseInt(br.readLine().split(",")[1].trim());
-        } catch (IOException e) {
-            System.out.println("Error: Missing config_1.txt file.");
-            System.exit(1);
-        }
-    }
 
     public static void printSummary() {
         System.out.println("\n\t    main >> ====================================================");
