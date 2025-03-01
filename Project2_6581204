@@ -14,6 +14,9 @@ package Project2_6581204;
  */
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 
 class Project2_6581204 {
     static int days;
@@ -26,11 +29,13 @@ class Project2_6581204 {
     static List<OperatorThread> operators = new ArrayList<>();
     static List<Place> places = new ArrayList<>();
     
-    // Synchronization object for controlling day progression
-    private static final Object daySync = new Object();
+    static CountDownLatch agencyLatch;  // ✅ Latch to sync agencies and operators
+    static CyclicBarrier customerBarrier; 
 
     public static void main(String[] args) {
-        Installment installment = new Installment("configs.txt");
+        Installment installment = new Installment("config_1.txt");
+        
+        customerBarrier = new CyclicBarrier(agencyCount);
        
         // Create Places
         for (int i = 0; i < placeCount; i++) {
@@ -65,31 +70,41 @@ class Project2_6581204 {
         System.out.println("\t    main >> Places                   = " + places);
         System.out.println("\t    main >> \n");
 
-
-        // Start all threads
         for (OperatorThread op : operators) op.start();
         for (AgencyThread ag : agencies) ag.start();
 
-         // ✅ Ensure "Day X" is printed before agencies proceed
         for (int day = 1; day <= days; day++) {
-            synchronized (daySync) {
-                System.out.println("\t    main >> ====================================================");
-                System.out.println("\t    main >> Day " + day);
-                System.out.println("\t    main >>");
+            agencyLatch = new CountDownLatch(agencyCount);  // ✅ Reset latch for each day
+            customerBarrier = new CyclicBarrier(agencyCount);
+            System.out.println("\t    main >> ====================================================");
+            System.out.println("\t    main >> Day " + day);
+            System.out.println("\t    main >>");
 
-                daySync.notifyAll();  // ✅ Notify agencies that they can start
+            synchronized (Project2_6581204.class) {
+                Project2_6581204.class.notifyAll();  // Start the day's activities
             }
 
             try {
-                Thread.sleep(1000);  // Allow threads to process before moving to the next day
+                agencyLatch.await();  // ✅ Wait for all agencies to finish assigning customers
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            
+
+            for (OperatorThread op : operators) {
+                synchronized (op) {
+                    op.notify();  // ✅ Notify operators to process their customers
+                }
+            }
+
+            try {
+                Thread.sleep(1000);  // Let threads process before the next day
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
             System.out.println("\t    main >>");
         }
 
-        // Wait for all threads to complete
         for (AgencyThread ag : agencies) {
             try { ag.join(); } catch (InterruptedException e) {}
         }
@@ -97,31 +112,21 @@ class Project2_6581204 {
             try { op.join(); } catch (InterruptedException e) {}
         }
 
-        
-
-        // Print Summary
         printSummary();
     }
-     // Class to handle missing config.txt file
-        static class Installment {
-            public Installment(String filename) {
+
+    static class Installment {
+        public Installment(String filename) {
+            try (Scanner scanner = new Scanner(new File("src/main/java/Project2_6581204/" + filename))) {
+                loadInstallmentData("src/main/java/Project2_6581204/" + filename);
+            } catch (Exception e) {
+                System.out.println(e + "\nNew file name =");
                 Scanner input = new Scanner(System.in);
-
-                while (true) {
-                    filename = "src/main/java/Project2_6581204/" + filename;
-                    try (Scanner scanner = new Scanner(new File(filename))) {
-                        break;
-                    } catch (Exception e) {
-                        System.out.println( e + "\nNew file name =");
-                        filename = input.nextLine();
-                    }
-                }
-
-                loadInstallmentData(filename);
+                loadInstallmentData(input.nextLine());
             }
-    
-       }
-    // Read the config.txt file
+        }
+    }
+
     public static void loadInstallmentData(String filename) {
         try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
             days = Integer.parseInt(br.readLine().split(",")[1].trim());
@@ -140,63 +145,62 @@ class Project2_6581204 {
         }
     }
 
-    // Print summary of total customers per tour
     public static void printSummary() {
         System.out.println("\n\t    main >> ====================================================");
         System.out.println("\t    main >> Summary");
 
-        // Sort tours by total customers in descending order
         tours.sort((a, b) -> Integer.compare(b.totalCustomers, a.totalCustomers));
 
-        // Print summary in the new format
         for (Tour tour : tours) {
             System.out.printf("\t    main >> %s       total customers = %d%n", tour.name, tour.totalCustomers);
         }
     }
-
 }
 
-// Travel Agency Thread
 class AgencyThread extends Thread {
     Random rand = new Random();
-    
+
     public AgencyThread(String name) {
         super(name);
     }
     
     @Override
     public String toString() {
-        return getName(); // This ensures it prints as "AgencyThread_0", "AgencyThread_1", etc.
+        return getName();
     }
 
-
     public void run() {
-    for (int day = 1; day <= Project2_6581204.days; day++) {
-        int arrivingCustomers = rand.nextInt(Project2_6581204.maxDailyArrival + 1);
-        System.out.printf("%-2s >> new arrival = %d   \t\t\tremaining customers = %d%n", 
-                          getName(), arrivingCustomers, arrivingCustomers);
+        for (int day = 1; day <= Project2_6581204.days; day++) {
+            synchronized (Project2_6581204.class) {
+                try {
+                    Project2_6581204.class.wait();  // Wait for the day to start
+                } catch (InterruptedException e) {}
+            }
 
+            int arrivingCustomers = rand.nextInt(Project2_6581204.maxDailyArrival + 1);
+            System.out.printf("%-2s >> new arrival = %d   \t\t\tremaining customers = %d%n", 
+                              getName(), arrivingCustomers, arrivingCustomers);
+            
+             try {
+                Project2_6581204.customerBarrier.await();  // ✅ Ensures all agencies reach this point before moving on
+            } catch (InterruptedException | BrokenBarrierException e) {}
 
-            // Assign customers to random tours
             while (arrivingCustomers > 0) {
                 Tour randomTour = Project2_6581204.tours.get(rand.nextInt(Project2_6581204.tours.size()));
                 int assigned = randomTour.addCustomers(arrivingCustomers);
                 arrivingCustomers -= assigned;
 
-                // Only print if at least 1 customer is sent
-                if (assigned > 0) { // ✅ Only print if at least 1 customer is sent
-                System.out.printf("%-2s >> send %d customers to %s\t\tseats taken = %d%n", 
-                                  getName(), assigned, randomTour.name, randomTour.getCurrentSeats());
+                if (assigned > 0) {
+                    System.out.printf("%-2s >> send %d customers to %s\t\tseats taken = %d%n", 
+                                      getName(), assigned, randomTour.name, randomTour.getCurrentSeats());
                 }
             }
 
-            try { Thread.sleep(500); } catch (InterruptedException e) {}
+            Project2_6581204.agencyLatch.countDown();  // ✅ Mark this agency as finished
         }
     }
 }
 
-
-// Tour Class
 class Tour {
     String name;
     int capacity;
@@ -208,7 +212,6 @@ class Tour {
         this.capacity = capacity;
     }
 
-    // Add customers, ensuring not to exceed capacity
     public synchronized int addCustomers(int num) {
         int availableSeats = capacity - currentCustomers;
         int toAssign = Math.min(availableSeats, num);
@@ -217,51 +220,50 @@ class Tour {
         return toAssign;
     }
 
-    // Reset daily customer count
     public synchronized void resetDailyCount() {
         currentCustomers = 0;
     }
     
     public synchronized int getCurrentSeats() {
-        return currentCustomers;  // ✅ Return the number of customers currently in the tour
+        return currentCustomers;
     }
-
 }
 
-// Operator Thread
 class OperatorThread extends Thread {
     Tour tour;
     Random rand = new Random();
 
     public OperatorThread(Tour tour, int index) {  
-        super("OperatorThread_" + index); // ✅ Set thread name as "OperatorThread_1", "OperatorThread_2", etc.
+        super("OperatorThread_" + index);
         this.tour = tour;
     }
     
     @Override
     public String toString() {
-        return getName(); // Ensures "OperatorThread_0", "OperatorThread_1", etc.
+        return getName();
     }
 
     public void run() {
-    for (int day = 1; day <= Project2_6581204.days; day++) {
-        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        for (int day = 1; day <= Project2_6581204.days; day++) {
+            synchronized (this) {
+                try {
+                    wait();  // ✅ Wait for agencies to finish before taking action
+                } catch (InterruptedException e) {}
+            }
 
-        if (tour.currentCustomers == 0) {
-            System.out.printf("%s >> no customer%n", getName());
-        } else {
-            Place randomPlace = Project2_6581204.places.get(rand.nextInt(Project2_6581204.places.size()));
-            randomPlace.addVisitors(tour.currentCustomers);
-            System.out.printf("%s >> take %d customers to %s   \t\tvisitor count = %d%n", 
-                              getName(), tour.currentCustomers, randomPlace.name, randomPlace.visitorCount);
-            tour.resetDailyCount();
-        }
+            if (tour.currentCustomers == 0) {
+                System.out.printf("%s >> no customer%n", getName());
+            } else {
+                Place randomPlace = Project2_6581204.places.get(rand.nextInt(Project2_6581204.places.size()));
+                randomPlace.addVisitors(tour.currentCustomers);
+                System.out.printf("%s >> take %d customers to %s   \t\tvisitor count = %d%n", 
+                                  getName(), tour.currentCustomers, randomPlace.name, randomPlace.visitorCount);
+                tour.resetDailyCount();
+            }
         }
     }
-
 }
 
-// Place Class
 class Place {
     String name;
     int visitorCount = 0;
@@ -272,7 +274,7 @@ class Place {
     
     @Override
     public String toString() {
-        return name;  // This ensures "Place_0", "Place_1", etc.
+        return name;
     }
 
     public synchronized void addVisitors(int num) {
