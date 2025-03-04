@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
-
 package Project2_6581204;
 
 /**
@@ -29,7 +25,7 @@ class Project2_6581204 {
     static List<OperatorThread> operators = new ArrayList<>();
     static List<Place> places = new ArrayList<>();
     
-    static CountDownLatch agencyLatch;  // ✅ Latch to sync agencies and operators
+    static CountDownLatch agencyLatch;  
     static CyclicBarrier customerBarrier; 
 
     public static void main(String[] args) {
@@ -74,30 +70,30 @@ class Project2_6581204 {
         for (AgencyThread ag : agencies) ag.start();
 
         for (int day = 1; day <= days; day++) {
-            agencyLatch = new CountDownLatch(agencyCount);  // ✅ Reset latch for each day
+            agencyLatch = new CountDownLatch(agencyCount);  
             customerBarrier = new CyclicBarrier(agencyCount);
             System.out.println("\t    main >> ====================================================");
             System.out.println("\t    main >> Day " + day);
             System.out.println("\t    main >>");
 
             synchronized (Project2_6581204.class) {
-                Project2_6581204.class.notifyAll();  // Start the day's activities
+                Project2_6581204.class.notifyAll();  
             }
 
             try {
-                agencyLatch.await();  // ✅ Wait for all agencies to finish assigning customers
+                agencyLatch.await();  
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
             for (OperatorThread op : operators) {
                 synchronized (op) {
-                    op.notify();  // ✅ Notify operators to process their customers
+                    op.notify();  
                 }
             }
 
             try {
-                Thread.sleep(1000);  // Let threads process before the next day
+                Thread.sleep(1000);  
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -115,7 +111,6 @@ class Project2_6581204 {
         printSummary();
     }
 
-     // Class to handle missing config.txt file
         static class Installment {
             public Installment(String filename) {
                 Scanner input = new Scanner(System.in);
@@ -134,7 +129,7 @@ class Project2_6581204 {
             }
     
        }
-        // Read the config.txt file
+
         public static void loadInstallmentData(String filename) {
             try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
                 days = Integer.parseInt(br.readLine().split(",")[1].trim());
@@ -181,7 +176,7 @@ class AgencyThread extends Thread {
         for (int day = 1; day <= Project2_6581204.days; day++) {
             synchronized (Project2_6581204.class) {
                 try {
-                    Project2_6581204.class.wait();  // Wait for the day to start
+                    Project2_6581204.class.wait();  
                 } catch (InterruptedException e) {}
             }
 
@@ -190,7 +185,7 @@ class AgencyThread extends Thread {
                               getName(), arrivingCustomers, arrivingCustomers);
             
              try {
-                Project2_6581204.customerBarrier.await();  // ✅ Ensures all agencies reach this point before moving on
+                Project2_6581204.customerBarrier.await();  
             } catch (InterruptedException | BrokenBarrierException e) {}
 
             while (arrivingCustomers > 0) {
@@ -204,7 +199,7 @@ class AgencyThread extends Thread {
                 }
             }
 
-            Project2_6581204.agencyLatch.countDown();  // ✅ Mark this agency as finished
+            Project2_6581204.agencyLatch.countDown(); 
         }
     }
 }
@@ -255,7 +250,7 @@ class OperatorThread extends Thread {
         for (int day = 1; day <= Project2_6581204.days; day++) {
             synchronized (this) {
                 try {
-                    wait();  // ✅ Wait for agencies to finish before taking action
+                    wait(); 
                 } catch (InterruptedException e) {}
             }
 
