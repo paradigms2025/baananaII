@@ -35,6 +35,7 @@ public class Project2_6581204 {
     public static void main(String[] args) {
         // Read configuration
         new Installment("config.txt");
+        Check check = new Check(agencyCount);
         
         // Initialize synchronization mechanisms
         customerBarrier = new CyclicBarrier(agencyCount);
@@ -58,8 +59,11 @@ public class Project2_6581204 {
         // Create Agencies
         for (int i = 0; i < agencyCount; i++) {
             AgencyThread agency = new AgencyThread("AgencyThread_" + i);
+            agency.checkSet(check);
             agencies.add(agency);
         }
+        
+        
         
         // Print simulation parameters
         printParameters();
@@ -67,6 +71,7 @@ public class Project2_6581204 {
         // Start all threads
         for (OperatorThread op : operators) op.start();
         for (AgencyThread ag : agencies) ag.start();
+        
 
         // Simulate days
         for (int day = 1; day <= days; day++) {
@@ -210,9 +215,14 @@ public class Project2_6581204 {
 class AgencyThread extends Thread {
     Random rand = new Random();
     int remainingCustomers = 0;
+    Check check;
 
     public AgencyThread(String name) {
         super(name);
+    }
+    
+    public void checkSet(Check check){
+        this.check = check;
     }
     
     @Override
@@ -253,6 +263,11 @@ class AgencyThread extends Thread {
                     System.out.printf("%16s >> send %d customers to %s\t\tseats taken = %d%n", 
                                       getName(), assigned, randomTour.name, randomTour.getCurrentSeats());
                 }
+            }
+            
+            if(check.checkComplete() == check.getAgencyCount()){
+                System.out.printf("%16s >> \n", getName());
+                check.reset();
             }
             // Mark this agency as finished
             Project2_6581204.agencyLatch.countDown();
@@ -355,4 +370,24 @@ class Place {
     public synchronized void addVisitors(int num) {
         visitorCount += num;
     }
+}
+
+
+class Check{
+    private int completed;
+    private int agencyCount;
+    
+    public Check(int agencyCount){this.agencyCount = agencyCount;}
+    
+    public int getAgencyCount(){return agencyCount;}
+    
+    public int checkComplete(){
+        ++completed;
+        return completed;
+    }
+    
+    public void reset(){
+        completed = 0;
+    }
+            
 }
