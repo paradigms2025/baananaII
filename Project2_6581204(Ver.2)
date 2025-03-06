@@ -11,7 +11,7 @@ package Project2_6581204;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CountDownLatch;   //apply this library to help synchronize threads, except CyclicBarrier
 import java.util.concurrent.CyclicBarrier;
 
 public class Project2_6581204 {
@@ -33,42 +33,36 @@ public class Project2_6581204 {
     }
 
     public static void main(String[] args) {
-        // Read configuration
+
         new Installment("config.txt");
         Check check = new Check(agencyCount);
         
-        // Initialize synchronization mechanisms
+
         customerBarrier = new CyclicBarrier(agencyCount);
        
-        // Create Places
         for (int i = 0; i < placeCount; i++) {
             places.add(new Place("Place_" + i));
         }
 
-        // Create Tours
         for (int i = 0; i < tourCount; i++) {
             tours.add(new Tour("Tour_" + i, tourCapacity));
         }
 
-        // Create Operators
         for (int i = 0; i < tours.size(); i++) {
             OperatorThread operator = new OperatorThread(tours.get(i), i);
             operators.add(operator);
         }
 
-        // Create Agencies
         for (int i = 0; i < agencyCount; i++) {
             AgencyThread agency = new AgencyThread("AgencyThread_" + i);
             agency.checkSet(check);
             agencies.add(agency);
         }
         
-        
-        
-        // Print simulation parameters
+
         printParameters();
 
-        // Start all threads
+
         for (OperatorThread op : operators) op.start();
         for (AgencyThread ag : agencies) ag.start();
         
@@ -239,26 +233,24 @@ class AgencyThread extends Thread {
                 } catch (InterruptedException e) {}
             }
 
-            // Generate new customer arrivals
             int newCustomers = rand.nextInt(Project2_6581204.maxDailyArrival + 1);
             remainingCustomers += newCustomers;
 
-            // Print remaining customers
             System.out.printf("%16s >> new arrival = %d   \t\t\tremaining customers = %d%n", 
                               getName(), newCustomers, remainingCustomers);
             
-            // Synchronize agencies
+
             try {
                 Project2_6581204.customerBarrier.await();
             } catch (InterruptedException | BrokenBarrierException e) {}
 
-            // Distribute customers to tours
+
             while (remainingCustomers > 0) {
                 Tour randomTour = Project2_6581204.tours.get(rand.nextInt(Project2_6581204.tours.size()));
                 int assigned = randomTour.addCustomers(remainingCustomers);
                 remainingCustomers -= assigned;
 
-                // Print seats taken
+
                 if (assigned > 0) {
                     System.out.printf("%16s >> send %d customers to %s\t\tseats taken = %d%n", 
                                       getName(), assigned, randomTour.name, randomTour.getCurrentSeats());
@@ -269,13 +261,13 @@ class AgencyThread extends Thread {
                 System.out.printf("%16s >> \n", getName());
                 check.reset();
             }
-            // Mark this agency as finished
+
             Project2_6581204.agencyLatch.countDown();
         }
     }
 }
 
-// Tour class represents individual tours
+
 class Tour {
     String name;
     int capacity;
@@ -287,7 +279,7 @@ class Tour {
         this.capacity = capacity;
     }
 
-    // Synchronized method to add customers to tour
+
     public synchronized int addCustomers(int num) {
         int availableSeats = capacity - currentCustomers;
         int toAssign = Math.min(availableSeats, num);
@@ -296,18 +288,18 @@ class Tour {
         return toAssign;
     }
 
-    // Reset daily customer count
+
     public synchronized void resetDailyCount() {
         currentCustomers = 0;
     }
     
-    // Get current seats taken
+
     public synchronized int getCurrentSeats() {
         return currentCustomers;
     }
 }
 
-// Operator Thread represents tour operators
+
 class OperatorThread extends Thread {
     Tour tour;
     Random rand = new Random();
@@ -324,35 +316,35 @@ class OperatorThread extends Thread {
 
     public void run() {
         for (int day = 1; day <= Project2_6581204.days; day++) {
-            // Wait for agencies to finish
+
             synchronized (this) {
                 try {
                     wait();
                 } catch (InterruptedException e) {}
             }
 
-            // Handle tour with no customers
+
             if (tour.currentCustomers == 0) {
                 System.out.printf("%16s >> no customer%n", getName());
             } else {
-                // Select a random place
+
                 Place randomPlace = Project2_6581204.places.get(rand.nextInt(Project2_6581204.places.size()));
                 
-                // Add visitors to the place
+
                 randomPlace.addVisitors(tour.currentCustomers);
                 
-                // Print visitor count
+
                 System.out.printf("%16s >> take %d customers to %s   \t\tvisitor count = %d%n", 
                                   getName(), tour.currentCustomers, randomPlace.name, randomPlace.visitorCount);
                 
-                // Reset daily customer count
+
                 tour.resetDailyCount();
             }
         }
     }
 }
 
-// Place class represents destination places
+
 class Place {
     String name;
     int visitorCount = 0;
@@ -366,7 +358,7 @@ class Place {
         return name;
     }
 
-    // Synchronized method to add visitors
+
     public synchronized void addVisitors(int num) {
         visitorCount += num;
     }
