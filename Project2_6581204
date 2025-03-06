@@ -1,11 +1,7 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
-
 package Project2_6581204;
 
 /**
- *
+ * Travel Management Simulation Project
  * @author Sukumarn Srimai 6581085
            Rueti Limpacharoenkul 6581166
            Chantapat Tivalai 6581193
@@ -14,162 +10,211 @@ package Project2_6581204;
  */
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.*;
 
-class Project2_6581204 {
+
+public class Project2_6581204 {
     static int days;
-    static int agencyCount, maxDailyArrival;
-    static int tourCount, tourCapacity;
-    static int placeCount;
+    static int agencyNum, maxDailyArrival;
+    static int tourNum, tourCapacity;
+    static int placeNum;
 
     static List<AgencyThread> agencies = new ArrayList<>();
     static List<Tour> tours = new ArrayList<>();
     static List<OperatorThread> operators = new ArrayList<>();
     static List<Place> places = new ArrayList<>();
     
-    static CountDownLatch agencyLatch;  // ✅ Latch to sync agencies and operators
+    static CountDownLatch agencyLatch;  //apply this to help synchronize threads, except CyclicBarrier
     static CyclicBarrier customerBarrier; 
+    
+    private static String formatThreadName(String threadName) {
+        return String.format("%16s >> ", threadName);
+    }
 
     public static void main(String[] args) {
-        Installment installment = new Installment("config.txt");
+
+        new Installment("config.txt");
+        Check check = new Check(agencyNum);
         
-        customerBarrier = new CyclicBarrier(agencyCount);
+
+        customerBarrier = new CyclicBarrier(agencyNum);
        
-        // Create Places
-        for (int i = 0; i < placeCount; i++) {
-            places.add(new Place("Place_" + (i)));
+        for (int i = 0; i < placeNum; i++) {
+            places.add(new Place("Place_" + i));
         }
 
-        // Create Tours
-        for (int i = 0; i < tourCount; i++) {
-            tours.add(new Tour("Tour_" + (i), tourCapacity));
+        for (int i = 0; i < tourNum; i++) {
+            tours.add(new Tour("Tour_" + i, tourCapacity));
         }
 
-        // Create Operators
         for (int i = 0; i < tours.size(); i++) {
             OperatorThread operator = new OperatorThread(tours.get(i), i);
             operators.add(operator);
         }
 
-
-        // Create Agencies
-        for (int i = 0; i < agencyCount; i++) {
-            AgencyThread agency = new AgencyThread("AgencyThread_" + (i));
+        for (int i = 0; i < agencyNum; i++) {
+            AgencyThread agency = new AgencyThread("AgencyThread_" + i);
+            agency.checkSet(check);
             agencies.add(agency);
         }
         
-         // Print parameters
-        System.out.println("\t    main >> ================= Parameters =====================");
-        System.out.println("\t    main >> Days of simulation       = " + days);
-        System.out.println("\t    main >> Max arrival              = " + maxDailyArrival);
-        System.out.println("\t    main >> AgencyThreads            = " + agencies);
-        System.out.println("\t    main >> Tour capacity            = " + tourCapacity);
-        System.out.println("\t    main >> OperatorThreads          = " + operators);
-        System.out.println("\t    main >> Places                   = " + places);
-        System.out.println("\t    main >> \n");
+
+        printParameters();
+
 
         for (OperatorThread op : operators) op.start();
         for (AgencyThread ag : agencies) ag.start();
+        
+
 
         for (int day = 1; day <= days; day++) {
-            agencyLatch = new CountDownLatch(agencyCount);  // ✅ Reset latch for each day
-            customerBarrier = new CyclicBarrier(agencyCount);
-            System.out.println("\t    main >> ====================================================");
-            System.out.println("\t    main >> Day " + day);
-            System.out.println("\t    main >>");
+            agencyLatch = new CountDownLatch(agencyNum);
+            customerBarrier = new CyclicBarrier(agencyNum);
+            
+            
+            printDayHeader(day);
+
 
             synchronized (Project2_6581204.class) {
-                Project2_6581204.class.notifyAll();  // Start the day's activities
+                Project2_6581204.class.notifyAll();
             }
 
             try {
-                agencyLatch.await();  // ✅ Wait for all agencies to finish assigning customers
+                agencyLatch.await();
             } catch (InterruptedException e) {
-                e.printStackTrace();
             }
+
 
             for (OperatorThread op : operators) {
                 synchronized (op) {
-                    op.notify();  // ✅ Notify operators to process their customers
+                    op.notify();
                 }
             }
 
+
             try {
-                Thread.sleep(1000);  // Let threads process before the next day
+                Thread.sleep(500);
             } catch (InterruptedException e) {
-                e.printStackTrace();
             }
 
-            System.out.println("\t    main >>");
+            System.out.println(formatThreadName(Thread.currentThread().getName()) + " \n");
         }
 
-        for (AgencyThread ag : agencies) {
-            try { ag.join(); } catch (InterruptedException e) {}
-        }
-        for (OperatorThread op : operators) {
-            try { op.join(); } catch (InterruptedException e) {}
-        }
+
+        waitForThreadCompletion();
+
 
         printSummary();
     }
 
-     // Class to handle missing config.txt file
-        static class Installment {
-            public Installment(String filename) {
-                Scanner input = new Scanner(System.in);
 
-                while (true) {
-                    filename = "src/main/java/Project2_6581204/" + filename;
-                    try (Scanner scanner = new Scanner(new File(filename))) {
-                        break;
-                    } catch (Exception e) {
-                        System.out.println( e + "\nNew file name =");
-                        filename = input.nextLine();
-                    }
-                }
+    private static void printParameters() {
+        String threadName = Thread.currentThread().getName();
+        String formattedThreadName = formatThreadName(threadName);
+        System.out.println(formattedThreadName + "================= Parameters =====================");
+        System.out.println(formattedThreadName + "Days of simulation  = " + days);
+        System.out.println(formattedThreadName + "Max arrival         = " + maxDailyArrival);
+        System.out.println(formattedThreadName + "AgencyThreads       = " + agencies);
+        System.out.println(formattedThreadName + "Tour capacity       = " + tourCapacity);
+        System.out.println(formattedThreadName + "OperatorThreads     = " + operators);
+        System.out.println(formattedThreadName + "Places              = " + places);
+        System.out.println(formattedThreadName + "\n");
+    }
 
-                loadInstallmentData(filename);
-            }
-    
-       }
-        // Read the config.txt file
-        public static void loadInstallmentData(String filename) {
-            try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
-                days = Integer.parseInt(br.readLine().split(",")[1].trim());
-                String[] agencyData = br.readLine().split(",");
-                agencyCount = Integer.parseInt(agencyData[1].trim());
-                maxDailyArrival = Integer.parseInt(agencyData[2].trim());
 
-                String[] tourData = br.readLine().split(",");
-                tourCount = Integer.parseInt(tourData[1].trim());
-                tourCapacity = Integer.parseInt(tourData[2].trim());
+    private static void printDayHeader(int day) {
+        String threadName = Thread.currentThread().getName();
+        String formattedThreadName = formatThreadName(threadName);
+        System.out.println(formattedThreadName + "====================================================");
+        System.out.println(formattedThreadName + "Day " + day);
+        System.out.println(formattedThreadName );
+    }
 
-                placeCount = Integer.parseInt(br.readLine().split(",")[1].trim());
-            } catch (IOException e) {
-                System.out.println("Error: Missing config_1.txt file.");
-                System.exit(1);
+
+    private static void waitForThreadCompletion() {
+        for (AgencyThread ag : agencies) {
+            try { 
+                ag.join(); 
+            } catch (InterruptedException e) {
             }
         }
+        for (OperatorThread op : operators) {
+            try { 
+                op.join(); 
+            } catch (InterruptedException e) {
+            }
+        }
+    }
+
+
+    static class Installment {
+        public Installment(String filename) {
+            Scanner input = new Scanner(System.in);
+
+            while (true) {
+                filename = "src/main/java/Project2_6581204/" + filename;
+                try (Scanner scanner = new Scanner(new File(filename))) {
+                    break;
+                } catch (Exception e) {
+                    System.out.println(e + "\nNew file name =");
+                    filename = input.nextLine();
+                }
+            }
+
+            loadInstallmentData(filename);
+        }
+    }
+
+
+    public static void loadInstallmentData(String filename) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            days = Integer.parseInt(br.readLine().split(",")[1].trim());
+            String[] agencyData = br.readLine().split(",");
+            agencyNum = Integer.parseInt(agencyData[1].trim());
+            maxDailyArrival = Integer.parseInt(agencyData[2].trim());
+
+            String[] tourData = br.readLine().split(",");
+            tourNum = Integer.parseInt(tourData[1].trim());
+            tourCapacity = Integer.parseInt(tourData[2].trim());
+
+            placeNum = Integer.parseInt(br.readLine().split(",")[1].trim());
+        } catch (IOException e) {
+            System.out.println("Error: Missing config.txt file.");
+            System.exit(1);
+        }
+    }
+
 
     public static void printSummary() {
-        System.out.println("\n\t    main >> ====================================================");
-        System.out.println("\t    main >> Summary");
+        String threadName = Thread.currentThread().getName();
+        String formattedThreadName = formatThreadName(threadName);
+        System.out.println(formattedThreadName + "====================================================");
+        System.out.println(formattedThreadName + "Summary");
 
-        tours.sort((a, b) -> Integer.compare(b.totalCustomers, a.totalCustomers));
+
+        tours.sort((a, b) -> {
+            int customerComparison = Integer.compare(b.totalCustomers, a.totalCustomers);
+            return customerComparison != 0 ? customerComparison : a.name.compareTo(b.name);
+        });
 
         for (Tour tour : tours) {
-            System.out.printf("\t    main >> %s       total customers = %d%n", tour.name, tour.totalCustomers);
+            System.out.printf(formattedThreadName + "%s       total customers = %d%n", tour.name, tour.totalCustomers);
         }
     }
 }
 
+
 class AgencyThread extends Thread {
     Random rand = new Random();
+    int remainingCustomers = 0;
+    Check check;
 
     public AgencyThread(String name) {
         super(name);
+    }
+    
+    public void checkSet(Check check){
+        this.check = check;
     }
     
     @Override
@@ -179,35 +224,47 @@ class AgencyThread extends Thread {
 
     public void run() {
         for (int day = 1; day <= Project2_6581204.days; day++) {
+
             synchronized (Project2_6581204.class) {
                 try {
-                    Project2_6581204.class.wait();  // Wait for the day to start
+                    Project2_6581204.class.wait();
                 } catch (InterruptedException e) {}
             }
 
-            int arrivingCustomers = rand.nextInt(Project2_6581204.maxDailyArrival + 1);
-            System.out.printf("%-2s >> new arrival = %d   \t\t\tremaining customers = %d%n", 
-                              getName(), arrivingCustomers, arrivingCustomers);
+            int newCustomers = rand.nextInt(Project2_6581204.maxDailyArrival + 1);
+            remainingCustomers += newCustomers;
+
+            System.out.printf("%16s >> new arrival = %d   \t\t\tremaining customers = %d%n", 
+                              getName(), newCustomers, remainingCustomers);
             
-             try {
-                Project2_6581204.customerBarrier.await();  // ✅ Ensures all agencies reach this point before moving on
+
+            try {
+                Project2_6581204.customerBarrier.await();
             } catch (InterruptedException | BrokenBarrierException e) {}
 
-            while (arrivingCustomers > 0) {
+
+            while (remainingCustomers > 0) {
                 Tour randomTour = Project2_6581204.tours.get(rand.nextInt(Project2_6581204.tours.size()));
-                int assigned = randomTour.addCustomers(arrivingCustomers);
-                arrivingCustomers -= assigned;
+                int assigned = randomTour.addCustomers(remainingCustomers);
+                remainingCustomers -= assigned;
+
 
                 if (assigned > 0) {
-                    System.out.printf("%-2s >> send %d customers to %s\t\tseats taken = %d%n", 
+                    System.out.printf("%16s >> send %d customers to %s\t\tseats taken = %d%n", 
                                       getName(), assigned, randomTour.name, randomTour.getCurrentSeats());
                 }
             }
+            
+            if(check.checkComplete() == check.getAgencyNum()){
+                System.out.printf("%16s >> \n", getName());
+                check.reset();
+            }
 
-            Project2_6581204.agencyLatch.countDown();  // ✅ Mark this agency as finished
+            Project2_6581204.agencyLatch.countDown();
         }
     }
 }
+
 
 class Tour {
     String name;
@@ -220,6 +277,7 @@ class Tour {
         this.capacity = capacity;
     }
 
+
     public synchronized int addCustomers(int num) {
         int availableSeats = capacity - currentCustomers;
         int toAssign = Math.min(availableSeats, num);
@@ -228,14 +286,17 @@ class Tour {
         return toAssign;
     }
 
+
     public synchronized void resetDailyCount() {
         currentCustomers = 0;
     }
     
+
     public synchronized int getCurrentSeats() {
         return currentCustomers;
     }
 }
+
 
 class OperatorThread extends Thread {
     Tour tour;
@@ -253,24 +314,34 @@ class OperatorThread extends Thread {
 
     public void run() {
         for (int day = 1; day <= Project2_6581204.days; day++) {
+
             synchronized (this) {
                 try {
-                    wait();  // ✅ Wait for agencies to finish before taking action
+                    wait();
                 } catch (InterruptedException e) {}
             }
 
+
             if (tour.currentCustomers == 0) {
-                System.out.printf("%s >> no customer%n", getName());
+                System.out.printf("%16s >> no customer%n", getName());
             } else {
+
                 Place randomPlace = Project2_6581204.places.get(rand.nextInt(Project2_6581204.places.size()));
+                
+
                 randomPlace.addVisitors(tour.currentCustomers);
-                System.out.printf("%s >> take %d customers to %s   \t\tvisitor count = %d%n", 
+                
+
+                System.out.printf("%16s >> take %d customers to %s   \t\tvisitor count = %d%n", 
                                   getName(), tour.currentCustomers, randomPlace.name, randomPlace.visitorCount);
+                
+
                 tour.resetDailyCount();
             }
         }
     }
 }
+
 
 class Place {
     String name;
@@ -285,7 +356,28 @@ class Place {
         return name;
     }
 
+
     public synchronized void addVisitors(int num) {
         visitorCount += num;
     }
+}
+
+
+class Check{
+    private int completed;
+    private int agencyNum;
+    
+    public Check(int agencyNum){this.agencyNum = agencyNum;}
+    
+    public int getAgencyNum(){return agencyNum;}
+    
+    public int checkComplete(){
+        ++completed;
+        return completed;
+    }
+    
+    public void reset(){
+        completed = 0;
+    }
+            
 }
